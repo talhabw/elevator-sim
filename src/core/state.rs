@@ -121,7 +121,7 @@ impl Elevator {
         }
     }
 
-    fn _get_target_on_the_way(
+    fn get_target_on_the_way(
         &self,
         direction: ElevatorDirection,
         is_at_target: bool,
@@ -144,7 +144,7 @@ impl Elevator {
             .copied()
     }
 
-    fn _get_first_target_in_direction(
+    fn get_first_target_in_direction(
         &self,
         direction: ElevatorDirection,
     ) -> Option<ElevatorRequest> {
@@ -163,7 +163,7 @@ impl Elevator {
         }
     }
 
-    fn _get_best_target_with_opposite_direction(
+    fn get_best_target_with_opposite_direction(
         &self,
         direction: ElevatorDirection,
     ) -> Option<ElevatorRequest> {
@@ -184,29 +184,29 @@ impl Elevator {
         }
     }
 
-    fn _get_next_request_on_idle(&self) -> Option<ElevatorRequest> {
-        self._get_first_target_in_direction(ElevatorDirection::UP)
-            .or_else(|| self._get_first_target_in_direction(ElevatorDirection::DOWN))
+    fn get_next_request_on_idle(&self) -> Option<ElevatorRequest> {
+        self.get_first_target_in_direction(ElevatorDirection::UP)
+            .or_else(|| self.get_first_target_in_direction(ElevatorDirection::DOWN))
     }
 
-    fn _get_next_request_while_moving(
+    fn get_next_request_while_moving(
         &self,
         direction: ElevatorDirection,
     ) -> Option<ElevatorRequest> {
-        self._get_target_on_the_way(direction, false)
-            .or_else(|| self._get_best_target_with_opposite_direction(direction))
+        self.get_target_on_the_way(direction, false)
+            .or_else(|| self.get_best_target_with_opposite_direction(direction))
     }
 
-    fn _get_next_request_after_waiting(
+    fn get_next_request_after_waiting(
         &self,
         direction: ElevatorDirection,
     ) -> Option<ElevatorRequest> {
-        self._get_target_on_the_way(direction, true)
-            .or_else(|| self._get_first_target_in_direction(direction.opposite()))
-            .or_else(|| self._get_first_target_in_direction(direction))
+        self.get_target_on_the_way(direction, true)
+            .or_else(|| self.get_first_target_in_direction(direction.opposite()))
+            .or_else(|| self.get_first_target_in_direction(direction))
     }
 
-    fn _remove_finished_request(&mut self, direction: ElevatorDirection) {
+    fn remove_finished_request(&mut self, direction: ElevatorDirection) {
         let _ = self
             .request_buffer
             .remove(&ElevatorRequest::new(direction, self.current_floor))
@@ -216,10 +216,10 @@ impl Elevator {
             ));
     }
 
-    pub fn _state_loop(&mut self, dt_secs: f64) {
+    pub fn state_loop(&mut self, dt_secs: f64) {
         match &self.state {
             ElevatorState::IDLE => {
-                if let Some(request) = self._get_next_request_on_idle() {
+                if let Some(request) = self.get_next_request_on_idle() {
                     self.target_floor = request.floor;
 
                     if self.current_floor == request.floor {
@@ -238,7 +238,7 @@ impl Elevator {
             #[allow(unused_variables)]
             ElevatorState::WAITING(direction, doors) => {
                 let direction = direction.clone();
-                self._remove_finished_request(direction);
+                self.remove_finished_request(direction);
 
                 // todo better timer at one point, not a priority
                 self.waiting_time += dt_secs;
@@ -247,7 +247,7 @@ impl Elevator {
                 if self.waiting_time >= 5.0 {
                     self.waiting_time = 0.0;
 
-                    if let Some(request) = self._get_next_request_after_waiting(direction) {
+                    if let Some(request) = self.get_next_request_after_waiting(direction) {
                         self.target_floor = request.floor;
                         self.state = ElevatorState::MOVING(
                             request.recalculate_direction(self.current_floor),
@@ -263,7 +263,7 @@ impl Elevator {
                     // ElevatorState::WAITING(*direction, ElevatorDoorsState::CLOSED);
                 }
 
-                if let Some(request) = self._get_next_request_while_moving(*direction) {
+                if let Some(request) = self.get_next_request_while_moving(*direction) {
                     self.target_floor = request.floor;
                 } else {
                     // this should never happen, because:
@@ -322,7 +322,7 @@ mod state_tests {
             "elevator got the hall call to five-up"
         );
 
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         assert_eq!(
             elevator.state,
@@ -330,9 +330,9 @@ mod state_tests {
             "elevator started to move down"
         );
 
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         elevator.set_current_floor(7);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         assert_eq!(elevator.current_floor, 7, "elevator is at floor 7");
         assert_eq!(elevator.target_floor, 5, "elevator target = floor 5");
@@ -343,7 +343,7 @@ mod state_tests {
             "elevator got the hall call to three-up"
         );
 
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         assert_eq!(
             elevator.state,
@@ -351,13 +351,13 @@ mod state_tests {
             "elevator still moves down"
         );
 
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         assert_eq!(elevator.target_floor, 3, "elevator target = floor 3");
 
         elevator.notify_reached_target(3);
 
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         assert_eq!(elevator.target_floor, 5, "elevator target = floor 5");
     }
@@ -372,7 +372,7 @@ mod state_tests {
                 current - 1
             };
             elevator.set_current_floor(next);
-            elevator._state_loop(0.1); // Small time step for movement
+            elevator.state_loop(0.1); // Small time step for movement
 
             if next == target_floor {
                 elevator.notify_reached_target(next);
@@ -394,7 +394,7 @@ mod state_tests {
         );
 
         // Initial state loop should transition to MOVING UP
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::UP),
@@ -412,7 +412,7 @@ mod state_tests {
         );
 
         // After waiting period, should return to IDLE
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::IDLE,
@@ -434,7 +434,7 @@ mod state_tests {
         );
 
         // Initial state loop should transition to MOVING DOWN
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::DOWN),
@@ -452,7 +452,7 @@ mod state_tests {
         );
 
         // After waiting period, should return to IDLE
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::IDLE,
@@ -475,7 +475,7 @@ mod state_tests {
         assert_eq!(elevator.hall_call(req3), Ok(true));
 
         // Start moving
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::UP),
@@ -493,7 +493,7 @@ mod state_tests {
         );
 
         // Next destination
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::UP),
@@ -503,11 +503,11 @@ mod state_tests {
 
         // Continue to floor 5 and then 7
         simulate_movement(&mut elevator, 5);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         simulate_movement(&mut elevator, 7);
 
         // After final floor, should return to IDLE
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(elevator.state, ElevatorState::IDLE);
     }
 
@@ -520,7 +520,7 @@ mod state_tests {
         assert_eq!(elevator.car_call(7), Ok(true), "Should accept car call");
 
         // Should start moving up
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::UP),
@@ -540,7 +540,7 @@ mod state_tests {
         println!("{:#?}", elevator.state);
 
         // After brief wait, should continue to floor 10
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::UP),
@@ -553,7 +553,7 @@ mod state_tests {
         simulate_movement(&mut elevator, 10);
 
         // After reaching final destination, should return to IDLE
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(elevator.state, ElevatorState::IDLE);
     }
 
@@ -570,7 +570,7 @@ mod state_tests {
         assert_eq!(elevator.hall_call(down_req), Ok(true));
 
         // Should prioritize UP first (assumption based on implementation)
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::UP),
@@ -579,7 +579,7 @@ mod state_tests {
 
         // Complete the UP request
         simulate_movement(&mut elevator, 8);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Now should start moving DOWN for the second request
         assert_eq!(
@@ -590,7 +590,7 @@ mod state_tests {
 
         // Complete the DOWN request
         simulate_movement(&mut elevator, 2);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Finally return to IDLE
         assert_eq!(elevator.state, ElevatorState::IDLE);
@@ -606,7 +606,7 @@ mod state_tests {
         assert_eq!(elevator.hall_call(req1), Ok(true));
 
         // Start moving
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(elevator.state, ElevatorState::MOVING(ElevatorDirection::UP));
 
         // Elevator reaches floor 3
@@ -617,7 +617,7 @@ mod state_tests {
         assert_eq!(elevator.hall_call(req2), Ok(true));
 
         // Run state loop to update target
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Elevator should now target floor 5 first
         assert_eq!(
@@ -628,7 +628,7 @@ mod state_tests {
 
         // Continue to floor 5
         simulate_movement(&mut elevator, 5);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Then continue to floor 10
         assert_eq!(
@@ -648,7 +648,7 @@ mod state_tests {
         assert_eq!(elevator.hall_call(req), Ok(true));
 
         // Run state loop
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Elevator should immediately enter waiting state without moving
         assert_eq!(
@@ -658,7 +658,7 @@ mod state_tests {
         );
 
         // After waiting, should return to IDLE
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(elevator.state, ElevatorState::IDLE);
     }
 
@@ -706,7 +706,7 @@ mod state_tests {
         );
 
         // First should go up to 8 (UP requests get priority in IDLE state)
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(elevator.state, ElevatorState::MOVING(ElevatorDirection::UP));
         assert_eq!(elevator.get_target_floor(), 8);
 
@@ -717,7 +717,7 @@ mod state_tests {
         println!("{:#?}", elevator.current_floor);
         println!("{:#?}", elevator.target_floor);
 
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Now should check for requests in the UP direction beyond floor 8
         // Since there are none, it should transition to DOWN requests
@@ -735,17 +735,17 @@ mod state_tests {
 
         // Continue to floor 10
         simulate_movement(&mut elevator, 10);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Next should be floor 12
         assert_eq!(elevator.get_target_floor(), 12);
         simulate_movement(&mut elevator, 12);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // Finally to floor 2
         assert_eq!(elevator.get_target_floor(), 2);
         simulate_movement(&mut elevator, 2);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
 
         // After all requests, should be IDLE
         assert_eq!(elevator.state, ElevatorState::IDLE);
@@ -776,7 +776,7 @@ mod state_tests {
         );
 
         // Start waiting
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::WAITING(ElevatorDirection::UP, ElevatorDoorsState::CLOSED)
@@ -789,13 +789,13 @@ mod state_tests {
         );
 
         // Partial wait time
-        elevator._state_loop(3.0);
+        elevator.state_loop(3.0);
 
         // Should still be waiting
         assert!(matches!(elevator.state, ElevatorState::WAITING(_, _)));
 
         // Complete waiting time
-        elevator._state_loop(2.1);
+        elevator.state_loop(2.1);
 
         // Should now move to the new request
         assert_eq!(elevator.state, ElevatorState::MOVING(ElevatorDirection::UP));
@@ -818,13 +818,13 @@ mod state_tests {
         );
 
         // Should prioritize the UP direction first
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(elevator.state, ElevatorState::MOVING(ElevatorDirection::UP));
         assert_eq!(elevator.get_target_floor(), 8);
 
         // After handling that, should pick up the DOWN request at 7
         simulate_movement(&mut elevator, 8);
-        elevator._state_loop(5.1);
+        elevator.state_loop(5.1);
         assert_eq!(
             elevator.state,
             ElevatorState::MOVING(ElevatorDirection::DOWN)
