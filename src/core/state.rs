@@ -126,11 +126,11 @@ impl Elevator {
                 Ordering::Equal => true,
                 Ordering::Less => {
                     direction == ElevatorDirection::UP
-                        && (!is_at_target && request.floor <= self.target_floor)
+                        && (is_at_target || request.floor <= self.target_floor)
                 }
                 Ordering::Greater => {
                     direction == ElevatorDirection::DOWN
-                        && (!is_at_target && request.floor >= self.target_floor)
+                        && (is_at_target || request.floor >= self.target_floor)
                 }
             })
             .min_by_key(|request| (self.current_floor - request.floor).abs())
@@ -231,7 +231,9 @@ impl Elevator {
             #[allow(unused_variables)]
             ElevatorState::WAITING(direction, doors) => {
                 let direction = *direction;
-                self.remove_finished_request(direction);
+                if self.waiting_time == 0.0 {
+                    self.remove_finished_request(direction);
+                }
 
                 // todo better timer at one point, not a priority
                 self.waiting_time += dt_secs;
