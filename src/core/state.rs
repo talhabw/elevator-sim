@@ -281,6 +281,10 @@ impl Elevator {
         self.current_floor
     }
 
+    pub fn get_state(&self) -> &ElevatorState {
+        &self.state
+    }
+
     pub fn notify_reached_floor(&mut self, reached_floor: i8) -> Result<(), ElevatorFloorReachErr> {
         match self.state {
             ElevatorState::MOVING(direction) => {
