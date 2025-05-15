@@ -83,6 +83,12 @@ pub struct Elevator {
     waiting_time: f64,
 }
 
+impl Default for Elevator {
+    fn default() -> Self {
+        Elevator::new()
+    }
+}
+
 impl Elevator {
     pub fn new() -> Self {
         Self {
@@ -237,7 +243,7 @@ impl Elevator {
             // todo, implement doors
             #[allow(unused_variables)]
             ElevatorState::WAITING(direction, doors) => {
-                let direction = direction.clone();
+                let direction = *direction;
                 self.remove_finished_request(direction);
 
                 // todo better timer at one point, not a priority
