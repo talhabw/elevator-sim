@@ -28,13 +28,13 @@ impl ElevatorDirection {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum ElevatorDoorsState {
     OPEN,
     CLOSED,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum ElevatorState {
     MOVING(ElevatorDirection),
     WAITING(ElevatorDirection, ElevatorDoorsState),
@@ -43,8 +43,8 @@ pub enum ElevatorState {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct ElevatorRequest {
-    direction: ElevatorDirection,
-    floor: i8,
+    pub direction: ElevatorDirection,
+    pub floor: i8,
 }
 
 impl ElevatorRequest {
@@ -281,6 +281,14 @@ impl Elevator {
 
     pub fn get_current_floor(&self) -> i8 {
         self.current_floor
+    }
+
+    pub fn get_state(&self) -> &ElevatorState {
+        &self.state
+    }
+
+    pub fn get_all_requests(&self) -> Vec<ElevatorRequest> {
+        self.request_buffer.iter().cloned().collect()
     }
 
     pub fn notify_reached_floor(&mut self, reached_floor: i8) -> Result<(), ElevatorFloorReachErr> {
