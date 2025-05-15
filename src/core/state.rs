@@ -10,7 +10,6 @@ pub enum ElevatorRequestErr {
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum ElevatorFloorReachErr {
-    NotTarget,
     NotMoving,
 }
 
@@ -40,18 +39,6 @@ pub enum ElevatorState {
     MOVING(ElevatorDirection),
     WAITING(ElevatorDirection, ElevatorDoorsState),
     IDLE,
-}
-
-impl ElevatorState {
-    fn as_waiting(&self) -> Option<ElevatorState> {
-        match self {
-            ElevatorState::MOVING(direction) => Some(ElevatorState::WAITING(
-                *direction,
-                ElevatorDoorsState::CLOSED,
-            )),
-            _ => None,
-        }
-    }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
@@ -294,19 +281,19 @@ impl Elevator {
         self.current_floor
     }
 
-    pub fn notify_reached_target(&mut self, reached_floor: i8) -> Option<ElevatorFloorReachErr> {
-        self.current_floor = reached_floor;
+    pub fn notify_reached_floor(&mut self, reached_floor: i8) -> Result<(), ElevatorFloorReachErr> {
+        match self.state {
+            ElevatorState::MOVING(direction) => {
+                self.current_floor = reached_floor;
 
-        if self.current_floor != self.target_floor {
-            return Some(ElevatorFloorReachErr::NotTarget);
+                if self.current_floor == self.target_floor {
+                    self.state = ElevatorState::WAITING(direction, ElevatorDoorsState::CLOSED);
+                }
+
+                Ok(())
+            }
+            _ => Err(ElevatorFloorReachErr::NotMoving),
         }
-
-        match self.state.as_waiting() {
-            Some(new_state) => self.state = new_state,
-            None => return Some(ElevatorFloorReachErr::NotMoving),
-        }
-
-        None
     }
 }
 
@@ -361,7 +348,11 @@ mod state_tests {
 
         assert_eq!(elevator.target_floor, 3, "elevator target = floor 3");
 
-        elevator.notify_reached_target(3);
+        assert_eq!(
+            elevator.notify_reached_floor(3),
+            Ok(()),
+            "reached floor error"
+        );
 
         elevator.state_loop(5.1);
 
@@ -372,17 +363,17 @@ mod state_tests {
     fn simulate_movement(elevator: &mut Elevator, target_floor: i8) {
         while elevator.get_current_floor() != target_floor {
             let current = elevator.get_current_floor();
-            let next = if current < target_floor {
-                current + 1
-            } else {
-                current - 1
+            let next = match elevator.state {
+                ElevatorState::MOVING(direction) => match direction {
+                    ElevatorDirection::UP => current + 1,
+                    ElevatorDirection::DOWN => current - 1,
+                },
+                _ => current,
             };
-            elevator.set_current_floor(next);
-            elevator.state_loop(0.1); // Small time step for movement
 
-            if next == target_floor {
-                elevator.notify_reached_target(next);
-            }
+            assert_eq!(elevator.notify_reached_floor(next), Ok(()), "NotMoving");
+
+            elevator.state_loop(0.1); // Small time step for movement
         }
     }
 
