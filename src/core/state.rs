@@ -209,7 +209,7 @@ impl Elevator {
             ));
     }
 
-    pub fn state_loop(&mut self, dt_secs: f64) {
+    pub fn state_loop(&mut self, dt: f64) {
         match &self.state {
             ElevatorState::IDLE => {
                 if let Some(request) = self.get_next_request_on_idle() {
@@ -236,7 +236,7 @@ impl Elevator {
                 }
 
                 // todo better timer at one point, not a priority
-                self.waiting_time += dt_secs;
+                self.waiting_time += dt;
 
                 // After waiting period completes
                 if self.waiting_time >= 5.0 {

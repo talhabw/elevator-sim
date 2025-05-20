@@ -1,17 +1,13 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::mpsc,
-    thread,
-    time::{Duration, Instant},
-};
+use std::{cell::RefCell, rc::Rc, sync::mpsc, thread, time::Duration};
 
 use chrono::Local;
 use elevator_sim::{
-    Elevator, ElevatorController, ElevatorDirection, ElevatorPIDController, ElevatorPhysics,
-    ElevatorRequest, ElevatorState, Encoder, SimulatedEncoder, SimulatedMotor,
+    Elevator, ElevatorController, ElevatorPIDController, ElevatorPhysics, ElevatorRequest,
+    ElevatorState, Encoder, SimulatedEncoder, SimulatedMotor,
 };
 use fern::Dispatch;
+
+const TIME_STEP: f64 = 1.0 / 60.0;
 
 pub enum UserCommand {
     HallCall(ElevatorRequest),
@@ -78,30 +74,11 @@ fn main() {
     // User input from UI thread to main thread
     let (input_tx, input_rx) = mpsc::channel::<UserCommand>();
     // Display data from main thread to UI thread
-    let (output_tx, output_rx) = mpsc::channel::<DisplayData>();
+    // let (output_tx, output_rx) = mpsc::channel::<DisplayData>();
 
-    let _ = input_tx.send(UserCommand::CarCall(5));
-    let _ = input_tx.send(UserCommand::CarCall(7));
-    let _ = input_tx.send(UserCommand::CarCall(12));
-    let _ = input_tx.send(UserCommand::CarCall(15));
-
-    let _ = input_tx.send(UserCommand::HallCall(ElevatorRequest::new(
-        ElevatorDirection::DOWN,
-        8,
-    )));
-    let _ = input_tx.send(UserCommand::HallCall(ElevatorRequest::new(
-        ElevatorDirection::DOWN,
-        12,
-    )));
-
-    let _ = input_tx.send(UserCommand::CarCall(3));
-    let _ = input_tx.send(UserCommand::CarCall(0));
-
-    let mut previous = Instant::now();
+    let time_step = Duration::from_secs_f64(TIME_STEP);
     loop {
-        let now = Instant::now();
-        let dt_secs = now.duration_since(previous).as_secs_f64() + 0.7;
-        previous = now;
+        let dt = time_step.as_secs_f64();
         print!("\x1B[2J\x1B[1;1H");
 
         // Process user input from UI thread (non-blocking)
@@ -130,38 +107,21 @@ fn main() {
         }
 
         // State Loop - decide where to go -> outputs 'target_floor'
-        elevator.state_loop(dt_secs);
+        elevator.state_loop(dt);
         elevator_controller.set_target_floor(elevator.get_target_floor());
 
         // Control Loop - decide how to go -> outputs 'voltage'
-        elevator_controller.tick(dt_secs);
+        elevator_controller.tick(dt);
         physics.set_voltage(motor.borrow().get_voltage());
 
         // Physics Loop - decide what happened -> outputs 'position'
-        physics.update(dt_secs);
+        physics.update(dt);
         encoder.borrow_mut().set_position(physics.get_position());
 
-        // clone data to ui thread ???
-        let display_data = DisplayData {
-            logical_current_floor: elevator.get_current_floor(),
-            sensor_current_floor: None,
-            current_height: elevator_controller.get_current_height(),
-            target_height: elevator_controller.get_target_height(),
-            voltage: motor.borrow().get_voltage(),
-            velocity: physics.get_velocity(),
-            target_floor: elevator.get_target_floor(),
-            current_state: elevator.get_state().clone(),
-            sensor_at_target: elevator_controller.has_reached_target(),
-            active_requests: elevator.get_all_requests().clone(),
-        };
-        println!("Time: {}", Local::now().format("%Y-%m-%d %H:%M:%S%.3f"));
-        print!("{:#?}", display_data);
+        // if output_tx.send().is_err() {
+        // break;
+        // }
 
-        if output_tx.send(display_data).is_err() {
-            println!("[Main Sim] UI thread seems to have exited. Shutting down.");
-            break;
-        }
-
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(time_step);
     }
 }
