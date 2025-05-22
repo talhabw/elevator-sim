@@ -1,5 +1,8 @@
 use core::panic;
-use std::{cmp::Ordering, collections::HashSet};
+use std::{
+    cmp::Ordering,
+    collections::{HashSet, hash_set},
+};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum ElevatorRequestErr {
@@ -287,8 +290,8 @@ impl Elevator {
         &self.state
     }
 
-    pub fn get_all_requests(&self) -> Vec<ElevatorRequest> {
-        self.request_buffer.iter().cloned().collect()
+    pub fn get_all_requests(&self) -> hash_set::Iter<ElevatorRequest> {
+        self.request_buffer.iter()
     }
 
     pub fn notify_reached_floor(&mut self, reached_floor: i8) -> Result<(), ElevatorFloorReachErr> {
@@ -304,6 +307,10 @@ impl Elevator {
             }
             _ => Err(ElevatorFloorReachErr::NotMoving),
         }
+    }
+
+    pub fn get_waiting_time(&self) -> f64 {
+        self.waiting_time
     }
 }
 

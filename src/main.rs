@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc, sync::mpsc, thread, time::Duration};
 
 use chrono::Local;
 use elevator_sim::{
-    Elevator, ElevatorController, ElevatorPIDController, ElevatorPhysics, ElevatorRequest,
-    ElevatorState, Encoder, SimulatedEncoder, SimulatedMotor,
+    Elevator, ElevatorController, ElevatorDirection, ElevatorPIDController, ElevatorPhysics,
+    ElevatorRequest, Encoder, SimulatedEncoder, SimulatedMotor, ui,
 };
 use fern::Dispatch;
 
@@ -13,21 +13,6 @@ pub enum UserCommand {
     HallCall(ElevatorRequest),
     CarCall(i8),
     Quit,
-    NoOp,
-}
-
-#[derive(Clone, Debug)]
-pub struct DisplayData {
-    pub logical_current_floor: i8,
-    pub sensor_current_floor: Option<i8>,
-    pub current_height: f64,
-    pub target_height: f64,
-    pub target_floor: i8,
-    pub voltage: f64,
-    pub velocity: f64,
-    pub current_state: ElevatorState,
-    pub sensor_at_target: bool,
-    pub active_requests: Vec<ElevatorRequest>,
 }
 
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
@@ -70,16 +55,58 @@ fn main() {
         0.1,
     );
 
-    // Create channels for communication
-    // User input from UI thread to main thread
+    // get elevator calls using mpsc::channel
     let (input_tx, input_rx) = mpsc::channel::<UserCommand>();
-    // Display data from main thread to UI thread
-    // let (output_tx, output_rx) = mpsc::channel::<DisplayData>();
 
-    let time_step = Duration::from_secs_f64(TIME_STEP);
-    loop {
-        let dt = time_step.as_secs_f64();
-        print!("\x1B[2J\x1B[1;1H");
+    let input_thread = thread::spawn(move || {
+        loop {
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input).unwrap();
+            let parts: Vec<&str> = input.split_whitespace().collect();
+
+            if parts.is_empty() {
+                continue;
+            }
+
+            match parts[0] {
+                "h" => {
+                    if parts.len() != 3 {
+                        println!("Usage: h <floor> <u|d>");
+                        continue;
+                    }
+                    let floor: i8 = match parts[1].parse() {
+                        Ok(f) => f,
+                        Err(_) => continue,
+                    };
+                    let direction = match parts[2] {
+                        "u" => ElevatorDirection::UP,
+                        "d" => ElevatorDirection::DOWN,
+                        _ => continue,
+                    };
+                    let request = ElevatorRequest::new(direction, floor);
+                    input_tx.send(UserCommand::HallCall(request)).unwrap();
+                }
+                "c" => {
+                    if parts.len() != 2 {
+                        println!("Usage: c <floor>");
+                        continue;
+                    }
+                    let floor: i8 = match parts[1].parse() {
+                        Ok(f) => f,
+                        Err(_) => continue,
+                    };
+                    input_tx.send(UserCommand::CarCall(floor)).unwrap();
+                }
+                "q" => {
+                    input_tx.send(UserCommand::Quit).unwrap();
+                    break;
+                }
+                _ => {
+                    println!("Unknown command");
+                }
+            }
+        }
+    });
 
     let time_step = Duration::from_secs_f32(TIME_STEP);
     let dt = time_step.as_secs_f64();
@@ -105,10 +132,6 @@ fn main() {
             _ => {}
         }
 
-        if let Some(floor) = elevator_controller.get_current_floor() {
-            let _ = elevator.notify_reached_floor(floor);
-        }
-
         // State Loop - decide where to go -> outputs 'target_floor'
         elevator.state_loop(dt);
         elevator_controller.set_target_floor(elevator.get_target_floor());
@@ -123,10 +146,13 @@ fn main() {
             .borrow_mut()
             .set_position(physics.get_position() as f64);
 
-        // if output_tx.send().is_err() {
-        // break;
-        // }
+        if let Some(floor) = elevator_controller.get_current_floor() {
+            let _ = elevator.notify_reached_floor(floor);
+        }
 
+        ui::log_to_terminal(&elevator, &elevator_controller, &physics, motor.borrow());
         thread::sleep(time_step);
     }
+
+    input_thread.join().unwrap(); // Wait for the input thread to finish
 }
