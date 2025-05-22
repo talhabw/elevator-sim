@@ -7,7 +7,7 @@ use elevator_sim::{
 };
 use fern::Dispatch;
 
-const TIME_STEP: f64 = 1.0 / 60.0;
+const TIME_STEP: f32 = 1.0 / 60.0;
 
 pub enum UserCommand {
     HallCall(ElevatorRequest),
@@ -56,7 +56,7 @@ fn main() {
     let encoder = Rc::new(RefCell::new(SimulatedEncoder::new(0.0)));
     let motor = Rc::new(RefCell::new(SimulatedMotor::new()));
 
-    let mut physics = ElevatorPhysics::new(100.0, encoder.borrow().get_position(), 0.0);
+    let mut physics = ElevatorPhysics::new(100.0, 1.0, 3.0, 100.0, -9.81, 0.1);
 
     let mut elevator = Elevator::new();
 
@@ -81,6 +81,9 @@ fn main() {
         let dt = time_step.as_secs_f64();
         print!("\x1B[2J\x1B[1;1H");
 
+    let time_step = Duration::from_secs_f32(TIME_STEP);
+    let dt = time_step.as_secs_f64();
+    loop {
         // Process user input from UI thread (non-blocking)
         match input_rx.try_recv() {
             Ok(UserCommand::HallCall(request)) => match elevator.hall_call(request) {
@@ -112,11 +115,13 @@ fn main() {
 
         // Control Loop - decide how to go -> outputs 'voltage'
         elevator_controller.tick(dt);
-        physics.set_voltage(motor.borrow().get_voltage());
+        physics.set_voltage(motor.borrow().get_voltage() as f32);
 
         // Physics Loop - decide what happened -> outputs 'position'
-        physics.update(dt);
-        encoder.borrow_mut().set_position(physics.get_position());
+        physics.update();
+        encoder
+            .borrow_mut()
+            .set_position(physics.get_position() as f64);
 
         // if output_tx.send().is_err() {
         // break;
