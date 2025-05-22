@@ -1,5 +1,5 @@
 use crate::{
-    Elevator, ElevatorController, ElevatorPIDController, ElevatorPhysics, ElevatorRequest,
+    Elevator, ElevatorController, ElevatorPIDFFController, ElevatorPhysics, ElevatorRequest,
     ElevatorState, SimulatedMotor,
 };
 use std::cell::Ref;
@@ -34,7 +34,7 @@ pub fn format_elevator_state(state: &ElevatorState) -> String {
 
 pub fn log_to_terminal(
     elevator: &Elevator,
-    controller: &ElevatorPIDController,
+    controller: &ElevatorPIDFFController,
     physics: &ElevatorPhysics,
     motor: Ref<SimulatedMotor>,
 ) {

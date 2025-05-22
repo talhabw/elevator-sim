@@ -4,6 +4,8 @@ pub struct PIDController {
     kd: f64,
     integral: f64,
     previous_error: f64,
+    min_limit: f64,
+    max_limit: f64,
 }
 
 impl PIDController {
@@ -14,6 +16,8 @@ impl PIDController {
             kd,
             integral: 0.0,
             previous_error: 0.0,
+            min_limit: -f64::INFINITY,
+            max_limit: f64::INFINITY,
         }
     }
 
@@ -31,6 +35,25 @@ impl PIDController {
         let derivative = (error - self.previous_error) / dt;
         self.previous_error = error;
 
-        self.kp * error + self.ki * self.integral + self.kd * derivative
+        let raw_voltage = self.kp * error + self.ki * self.integral + self.kd * derivative;
+
+        raw_voltage.clamp(self.min_limit, self.max_limit)
+    }
+
+    pub fn set_output_limits(&mut self, min_limit: f64, max_limit: f64) {
+        self.min_limit = min_limit;
+        self.max_limit = max_limit;
+    }
+}
+
+pub struct FeedForward {
+    pub kg: f64,
+    pub kv: f64,
+    pub ka: f64,
+}
+
+impl FeedForward {
+    pub fn new(kg: f64, kv: f64, ka: f64) -> Self {
+        Self { kg, kv, ka }
     }
 }

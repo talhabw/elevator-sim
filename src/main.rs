@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc, sync::mpsc, thread, time::Duration};
 
 use chrono::Local;
 use elevator_sim::{
-    Elevator, ElevatorController, ElevatorDirection, ElevatorPIDController, ElevatorPhysics,
-    ElevatorRequest, Encoder, SimulatedEncoder, SimulatedMotor, ui,
+    Elevator, ElevatorController, ElevatorDirection, ElevatorPIDFFController, ElevatorPhysics,
+    ElevatorRequest, Encoder, FeedForward, PIDController, SimulatedEncoder, SimulatedMotor, ui,
 };
 use fern::Dispatch;
 
@@ -36,21 +36,21 @@ fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
 
 fn main() {
     setup_logger().expect("failed");
-
+    print!("\x1B[2J\x1B[1;1H");
     println!("elevator-sim.");
     let encoder = Rc::new(RefCell::new(SimulatedEncoder::new(0.0)));
     let motor = Rc::new(RefCell::new(SimulatedMotor::new()));
 
-    let mut physics = ElevatorPhysics::new(100.0, 1.0, 3.0, 100.0, -9.81, 0.1);
+    let mut physics = ElevatorPhysics::new(100.0, 1.0, 3.0, 3.10, -9.81, 100.0);
 
     let mut elevator = Elevator::new();
 
-    let mut elevator_controller = ElevatorPIDController::new(
+    let mut elevator_controller = ElevatorPIDFFController::new(
         Rc::clone(&encoder),
         Rc::clone(&motor),
-        1.0,
-        0.0,
-        25.0,
+        12.0,
+        PIDController::new(5.0, 0.0, 20.0),
+        FeedForward::new(10.0, 0.0, 0.0),
         5.0,
         0.1,
     );
